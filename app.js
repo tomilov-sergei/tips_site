@@ -1,0 +1,114 @@
+document.addEventListener('DOMContentLoaded', async () => {
+  const response = await fetch('tips.json');
+  const tips = await response.json();
+  let filtered = [...tips];
+
+  const searchInput = document.getElementById('searchInput');
+  const sortSelect = document.getElementById('sortSelect');
+  const themeToggle = document.getElementById('themeToggle');
+  const topicsContainer = document.getElementById('topicsContainer');
+  const resultsContainer = document.getElementById('results');
+
+  // Build topics list
+  const topicsSet = new Set();
+  tips.forEach(tip => {
+    if (Array.isArray(tip.topics) && tip.topics.length > 0) {
+      tip.topics.forEach(topic => topicsSet.add(topic));
+    } else {
+      topicsSet.add('Разное');
+    }
+  });
+
+  const topics = Array.from(topicsSet).sort();
+  topics.forEach(topic => {
+    const span = document.createElement('span');
+    span.className = 'topic';
+    span.textContent = topic;
+    span.addEventListener('click', () => {
+      span.classList.toggle('active');
+      applyFilters();
+    });
+    topicsContainer.appendChild(span);
+  });
+
+  function applyFilters() {
+    const query = searchInput.value.trim().toLowerCase();
+    const activeTopics = Array.from(topicsContainer.querySelectorAll('.topic.active')).map(el => el.textContent);
+    filtered = tips.filter(tip => {
+      const text = (tip.text || '').toLowerCase();
+      const author = (tip.author || '').toLowerCase();
+      const tipTopics = (tip.topics && tip.topics.length > 0) ? tip.topics : ['Разное'];
+      const matchQuery = !query || text.includes(query) || author.includes(query);
+      const matchTopic = activeTopics.length === 0 || tipTopics.some(t => activeTopics.includes(t));
+      return matchQuery && matchTopic;
+    });
+    applySort();
+    render();
+  }
+
+  function applySort() {
+    const sort = sortSelect.value;
+    filtered.sort((a, b) => {
+      if (sort === 'date') {
+        return new Date(b.date) - new Date(a.date);
+      } else if (sort === 'length') {
+        return a.text.length - b.text.length;
+      } else if (sort === 'author') {
+        return (a.author || '').localeCompare(b.author || '');
+      }
+      return 0;
+    });
+  }
+
+  function render() {
+    resultsContainer.innerHTML = '';
+    filtered.forEach(tip => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const h3 = document.createElement('h3');
+      h3.textContent = tip.author || 'Без автора';
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = tip.date || '';
+      const p = document.createElement('p');
+      p.textContent = tip.text;
+      const topicDiv = document.createElement('div');
+      if (tip.topics && tip.topics.length > 0) {
+        tip.topics.forEach(topic => {
+          const tSpan = document.createElement('span');
+          tSpan.className = 'topic';
+          tSpan.textContent = topic;
+          tSpan.addEventListener('click', () => {
+            const side = Array.from(topicsContainer.children).find(el => el.textContent === topic);
+            if (side) {
+              side.classList.toggle('active');
+              applyFilters();
+            }
+          });
+          topicDiv.appendChild(tSpan);
+        });
+      }
+      card.appendChild(h3);
+      card.appendChild(meta);
+      card.appendChild(p);
+      card.appendChild(topicDiv);
+      resultsContainer.appendChild(card);
+    });
+  }
+
+  searchInput.addEventListener('input', () => {
+    applyFilters();
+  });
+
+  sortSelect.addEventListener('change', () => {
+    applySort();
+    render();
+  });
+
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+  });
+
+  // initial
+  applyFilters();
+});
