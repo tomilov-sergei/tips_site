@@ -2,13 +2,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const response = await fetch('tips.json');
   const tips = await response.json();
   let filtered = [...tips];
-
   const searchInput = document.getElementById('searchInput');
   const sortSelect = document.getElementById('sortSelect');
   const themeToggle = document.getElementById('themeToggle');
   const topicsContainer = document.getElementById('topicsContainer');
   const resultsContainer = document.getElementById('results');
-
+  // hidden tips from localStorage
+  let hidden = JSON.parse(localStorage.getItem('hiddenTips') || '[]');
   // Build topics list
   const topicsSet = new Set();
   tips.forEach(tip => {
@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       topicsSet.add('Разное');
     }
   });
-
   const topics = Array.from(topicsSet).sort();
   topics.forEach(topic => {
     const span = document.createElement('span');
@@ -30,46 +29,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     topicsContainer.appendChild(span);
   });
-
   function applyFilters() {
-    const query = searchInput.value.trim().toLowerCase();
-    const activeTopics = Array.from(topicsContainer.querySelectorAll('.topic.active')).map(el => el.textContent);
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const activeTopics = Array.from(topicsContainer.children)
+      .filter(child => child.classList.contains('active'))
+      .map(child => child.textContent);
     filtered = tips.filter(tip => {
-      const text = (tip.text || '').toLowerCase();
-      const author = (tip.author || '').toLowerCase();
-      const tipTopics = (tip.topics && tip.topics.length > 0) ? tip.topics : ['Разное'];
-      const matchQuery = !query || text.includes(query) || author.includes(query);
-      const matchTopic = activeTopics.length === 0 || tipTopics.some(t => activeTopics.includes(t));
-      return matchQuery && matchTopic;
+      const key = (tip.date || '') + '|' + tip.text;
+      if (hidden.includes(key)) return false;
+      const haystack = (tip.text + ' ' + (tip.author || '') + ' ' + ((tip.topics || []).join(' '))).toLowerCase();
+      const matchesSearch = haystack.includes(searchTerm);
+      const matchesTopics = activeTopics.length === 0 || (Array.isArray(tip.topics) ? activeTopics.every(t => tip.topics.includes(t)) : activeTopics.includes('Разное'));
+      return matchesSearch && matchesTopics;
     });
     applySort();
     render();
   }
-
   function applySort() {
-    const sort = sortSelect.value;
+    const value = sortSelect.value;
     filtered.sort((a, b) => {
-      if (sort === 'date') {
+      if (value === 'date') {
         return new Date(b.date) - new Date(a.date);
-      } else if (sort === 'length') {
-        return a.text.length - b.text.length;
-      } else if (sort === 'author') {
+      } else if (value === 'length') {
+        return (b.text || '').length - (a.text || '').length;
+      } else if (value === 'author') {
         return (a.author || '').localeCompare(b.author || '');
       }
       return 0;
     });
   }
-
   function render() {
     resultsContainer.innerHTML = '';
     filtered.forEach(tip => {
+      const key = (tip.date || '') + '|' + tip.text;
       const card = document.createElement('div');
       card.className = 'card';
+      if (tip.text && tip.text.length < 50) card.classList.add('short');
+      if (tip.text && tip.text.length > 200) card.classList.add('long');
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delete-btn';
+      delBtn.textContent = '🗑️';
+      delBtn.title = 'Скрыть';
+      delBtn.addEventListener('click', () => {
+        if (!hidden.includes(key)) {
+          hidden.push(key);
+          localStorage.setItem('hiddenTips', JSON.stringify(hidden));
+          applyFilters();
+        }
+      });
       const h3 = document.createElement('h3');
-      h3.textContent = tip.author || 'Без автора';
+      h3.textContent = tip.author || 'Аноним';
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.textContent = tip.date || '';
+      try {
+        const dateObj = new Date(tip.date);
+        meta.textContent = dateObj.toLocaleString();
+      } catch (e) {
+        meta.textContent = tip.date;
+      }
       const p = document.createElement('p');
       p.textContent = tip.text;
       const topicDiv = document.createElement('div');
@@ -88,6 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           topicDiv.appendChild(tSpan);
         });
       }
+      card.appendChild(delBtn);
       card.appendChild(h3);
       card.appendChild(meta);
       card.appendChild(p);
@@ -95,20 +113,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       resultsContainer.appendChild(card);
     });
   }
-
-  searchInput.addEventListener('input', () => {
-    applyFilters();
-  });
-
-  sortSelect.addEventListener('change', () => {
-    applySort();
-    render();
-  });
-
+  searchInput.addEventListener('input', () => applyFilters());
+  sortSelect.addEventListener('change', () => { applySort(); render(); });
   themeToggle.addEventListener('click', () => {
     document.body.classList.toggle('dark');
   });
-
-  // initial
   applyFilters();
 });
