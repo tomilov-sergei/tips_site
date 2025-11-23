@@ -5,12 +5,10 @@ body {
   background-color: #f5f5f5;
   color: #333;
 }
-
 body.dark {
   background-color: #121212;
   color: #eee;
 }
-
 header {
   padding: 1rem;
   display: flex;
@@ -19,72 +17,78 @@ header {
   gap: 1rem;
   background-color: #fff;
 }
-
 body.dark header {
   background-color: #1f1f1f;
 }
-
 #searchInput {
   flex: 1;
   padding: 0.5rem;
   font-size: 1rem;
 }
-
 #sortSelect {
   padding: 0.5rem;
 }
-
-#themeToggle {
-  padding: 0.5rem 1rem;
-}
-
 #topicsContainer {
   display: flex;
-  gap: 0.5rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
-
 .topic {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
   background-color: #e0e0e0;
   border-radius: 4px;
-  padding: 0.25rem 0.5rem;
   cursor: pointer;
 }
-
 body.dark .topic {
   background-color: #333;
   color: #eee;
 }
-
 .topic.active {
   background-color: #2196f3;
   color: #fff;
 }
-
 main#results {
   padding: 1rem;
 }
-
 .card {
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 1rem;
   margin-bottom: 1rem;
+  position: relative;
 }
-
 body.dark .card {
   border-color: #333;
 }
-
 .card h3 {
   margin-top: 0;
 }
-
 .card .meta {
   font-size: 0.8rem;
   color: #666;
 }
-
 body.dark .card .meta {
   color: #aaa;
+}
+/* highlight short and long cards */
+.card.short {
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+.card.long {
+  font-weight: bold;
+}
+/* delete button */
+.delete-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.delete-btn:hover {
+  color: #e53935;
 }
