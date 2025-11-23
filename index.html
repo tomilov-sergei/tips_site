@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>База полезных советов</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>База полезных советов</h1>
+    <input type="search" id="searchInput" placeholder="Поиск...">
+    <select id="sortSelect">
+      <option value="date">Сортировка по дате</option>
+      <option value="length">Сортировка по длине</option>
+      <option value="author">Сортировка по автору</option>
+    </select>
+    <button id="themeToggle">Светлая/Тёмная тема</button>
+    <div id="topicsContainer"></div>
+  </header>
+  <main id="results"></main>
+  <script src="app.js"></script>
+</body>
+</html>
