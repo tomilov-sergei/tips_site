@@ -1,17 +1,35 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const response = await fetch('tips.json');
-  const tips = await response.json();
-  let filtered = [...tips];
+  const tipsData = await response.json();
+
+  // Build mapping of tips by id and collect replies
+  const tipsById = {};
+  tipsData.forEach(t => {
+    tipsById[t.id] = { ...t, replies: [] };
+  });
+  const topLevel = [];
+  tipsData.forEach(t => {
+    if (t.reply_to && tipsById[t.reply_to]) {
+      tipsById[t.reply_to].replies.push(t);
+    } else {
+      topLevel.push(tipsById[t.id]);
+    }
+  });
+
+  let filtered = [...topLevel];
+
   const searchInput = document.getElementById('searchInput');
   const sortSelect = document.getElementById('sortSelect');
   const themeToggle = document.getElementById('themeToggle');
   const topicsContainer = document.getElementById('topicsContainer');
   const resultsContainer = document.getElementById('results');
-  // hidden tips from localStorage
+
+  // hidden tips IDs
   let hidden = JSON.parse(localStorage.getItem('hiddenTips') || '[]');
-  // Build topics list
+
+  // Build unique topics list
   const topicsSet = new Set();
-  tips.forEach(tip => {
+  topLevel.forEach(tip => {
     if (Array.isArray(tip.topics) && tip.topics.length > 0) {
       tip.topics.forEach(topic => topicsSet.add(topic));
     } else {
@@ -29,94 +47,130 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     topicsContainer.appendChild(span);
   });
+
+  searchInput.addEventListener('input', applyFilters);
+  sortSelect.addEventListener('change', applyFilters);
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+  });
+
   function applyFilters() {
-    const searchTerm = searchInput.value.toLowerCase().trim();
-    const activeTopics = Array.from(topicsContainer.children)
-      .filter(child => child.classList.contains('active'))
-      .map(child => child.textContent);
-    filtered = tips.filter(tip => {
-      const key = (tip.date || '') + '|' + tip.text;
-      if (hidden.includes(key)) return false;
-      const haystack = (tip.text + ' ' + (tip.author || '') + ' ' + ((tip.topics || []).join(' '))).toLowerCase();
-      const matchesSearch = haystack.includes(searchTerm);
-      const matchesTopics = activeTopics.length === 0 || (Array.isArray(tip.topics) ? activeTopics.every(t => tip.topics.includes(t)) : activeTopics.includes('Разное'));
-      return matchesSearch && matchesTopics;
+    const searchTerm = searchInput.value.toLowerCase();
+    const activeTopics = Array.from(topicsContainer.getElementsByClassName('active')).map(span => span.textContent);
+    filtered = topLevel.filter(tip => {
+      if (hidden.includes(tip.id)) return false;
+      // topic filter
+      if (activeTopics.length > 0) {
+        if (!tip.topics || tip.topics.length === 0) {
+          if (!activeTopics.includes('Разное')) return false;
+        } else {
+          const has = tip.topics.some(t => activeTopics.includes(t));
+          if (!has) return false;
+        }
+      }
+      // search filter
+      const text = (tip.text || '').toLowerCase();
+      const author = (tip.author || '').toLowerCase();
+      const combinedTopics = (tip.topics || []).join(' ').toLowerCase();
+      if (searchTerm && !(text.includes(searchTerm) || author.includes(searchTerm) || combinedTopics.includes(searchTerm))) {
+        return false;
+      }
+      return true;
     });
-    applySort();
-    render();
-  }
-  function applySort() {
-    const value = sortSelect.value;
+
+    const sortValue = sortSelect.value;
     filtered.sort((a, b) => {
-      if (value === 'date') {
+      if (sortValue === 'date') {
         return new Date(b.date) - new Date(a.date);
-      } else if (value === 'length') {
-        return (b.text || '').length - (a.text || '').length;
-      } else if (value === 'author') {
+      } else if (sortValue === 'length') {
+        return b.text.length - a.text.length;
+      } else if (sortValue === 'author') {
         return (a.author || '').localeCompare(b.author || '');
       }
       return 0;
     });
+    render();
   }
+
   function render() {
     resultsContainer.innerHTML = '';
     filtered.forEach(tip => {
-      const key = (tip.date || '') + '|' + tip.text;
       const card = document.createElement('div');
       card.className = 'card';
-      if (tip.text && tip.text.length < 50) card.classList.add('short');
-      if (tip.text && tip.text.length > 200) card.classList.add('long');
-      const delBtn = document.createElement('button');
-      delBtn.className = 'delete-btn';
-      delBtn.textContent = '🗑️';
-      delBtn.title = 'Скрыть';
-      delBtn.addEventListener('click', () => {
-        if (!hidden.includes(key)) {
-          hidden.push(key);
-          localStorage.setItem('hiddenTips', JSON.stringify(hidden));
-          applyFilters();
-        }
-      });
+
+      // Author heading
       const h3 = document.createElement('h3');
-      h3.textContent = tip.author || 'Аноним';
+      h3.textContent = tip.author || '';
+      card.appendChild(h3);
+
+      // Date meta
       const meta = document.createElement('div');
       meta.className = 'meta';
-      try {
-        const dateObj = new Date(tip.date);
-        meta.textContent = dateObj.toLocaleString();
-      } catch (e) {
-        meta.textContent = tip.date;
-      }
+      const date = new Date(tip.date);
+      meta.textContent = date.toLocaleDateString('fi-FI');
+      card.appendChild(meta);
+
+      // Main text with link formatting
       const p = document.createElement('p');
-      p.textContent = tip.text;
-      const topicDiv = document.createElement('div');
-      if (tip.topics && tip.topics.length > 0) {
-        tip.topics.forEach(topic => {
-          const tSpan = document.createElement('span');
-          tSpan.className = 'topic';
-          tSpan.textContent = topic;
-          tSpan.addEventListener('click', () => {
-            const side = Array.from(topicsContainer.children).find(el => el.textContent === topic);
-            if (side) {
-              side.classList.toggle('active');
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const html = (tip.text || '').replace(urlRegex, url => `<a href="${url}" target="_blank">${url}</a>`);
+      p.innerHTML = html;
+      card.appendChild(p);
+
+      // Topics chips inside card
+      if (Array.isArray(tip.topics)) {
+        const topicsDiv = document.createElement('div');
+        tip.topics.forEach(t => {
+          const chip = document.createElement('span');
+          chip.className = 'topic';
+          chip.textContent = t;
+          chip.addEventListener('click', () => {
+            const sidebarChip = Array.from(topicsContainer.children).find(s => s.textContent === t);
+            if (sidebarChip) {
+              sidebarChip.classList.toggle('active');
               applyFilters();
             }
           });
-          topicDiv.appendChild(tSpan);
+          topicsDiv.appendChild(chip);
         });
+        card.appendChild(topicsDiv);
       }
-      card.appendChild(delBtn);
-      card.appendChild(h3);
-      card.appendChild(meta);
-      card.appendChild(p);
-      card.appendChild(topicDiv);
+
+      // delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerHTML = '🗑️';
+      deleteBtn.addEventListener('click', () => {
+        hidden.push(tip.id);
+        localStorage.setItem('hiddenTips', JSON.stringify(hidden));
+        applyFilters();
+      });
+      card.appendChild(deleteBtn);
+
+      // Replies
+      if (tip.replies && tip.replies.length > 0) {
+        const repliesContainer = document.createElement('div');
+        repliesContainer.className = 'replies';
+        tip.replies.forEach(reply => {
+          const replyDiv = document.createElement('div');
+          replyDiv.className = 'reply';
+          const replyMeta = document.createElement('div');
+          replyMeta.className = 'meta';
+          const rDate = new Date(reply.date);
+          replyMeta.textContent = `${reply.author || ''} · ${rDate.toLocaleDateString('fi-FI')}`;
+          replyDiv.appendChild(replyMeta);
+          const replyP = document.createElement('p');
+          const replyHtml = (reply.text || '').replace(urlRegex, url => `<a href="${url}" target="_blank">${url}</a>`);
+          replyP.innerHTML = replyHtml;
+          replyDiv.appendChild(replyP);
+          repliesContainer.appendChild(replyDiv);
+        });
+        card.appendChild(repliesContainer);
+      }
+
       resultsContainer.appendChild(card);
     });
   }
-  searchInput.addEventListener('input', () => applyFilters());
-  sortSelect.addEventListener('change', () => { applySort(); render(); });
-  themeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('dark');
-  });
+
   applyFilters();
 });
