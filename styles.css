@@ -111,3 +111,14 @@ a {
 body.dark a {
   color: #8ab4f8;
 }
+/* Limit width and spacing */
+header, #topicsContainer, #results {
+  max-width: 800px;
+  margin: 0 auto;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.card {
+  margin-bottom: 16px;
+}
