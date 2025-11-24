@@ -113,8 +113,8 @@ body.dark a {
 header, #topicsContainer, #results {
   max-width: 800px;
   margin: 0 auto;
-  padding-left: 24px;
-  padding-right: 24px;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .card {
